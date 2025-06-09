@@ -24,7 +24,6 @@ body {
   pointer-events: none;
 }
 
-
 .status-〇 {
   color: green;
 }
@@ -47,4 +46,21 @@ body {
   font-size: 1em;
   margin-left: 5px;
   cursor: pointer;
+}
+
+/* ログインエリアのスタイル（スマホ対応） */
+#login-area {
+  text-align: center;
+  padding: 15px;
+}
+
+#login-area input,
+#login-area button {
+  margin: 5px 5px 10px 5px;
+  padding: 8px;
+  width: 100%;
+  max-width: 280px;
+  box-sizing: border-box;
+  display: block;
+  font-size: 1em;
 }
