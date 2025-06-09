@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ゲーム予約システム</title>
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet" />
+  <style>
+    #calendar {
+      max-width: 900px;
+      margin: 20px auto;
+    }
+    .status-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-weight: 900;
+      font-size: 26px;
+      pointer-events: none;
+      user-select: none;
+      font-family: "Arial Black", Arial, sans-serif;
+    }
+    #reserve-form {
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    #reserve-result {
+      font-weight: bold;
+      margin-top: 10px;
+      text-align: center;
+    }
+    button {
+      cursor: pointer;
+      padding: 6px 14px;
+      font-size: 14px;
+      border-radius: 4px;
+      border: 1px solid #333;
+      background-color: #f0f0f0;
+      margin-right: 10px;
+    }
+    button:hover {
+      background-color: #ddd;
+    }
+    #login-area {
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 10px;
+      border: 1px solid #666;
+      border-radius: 6px;
+      text-align: center;
+      position: relative;
+    }
+    #login-area input {
+      margin: 0 5px;
+      padding: 5px;
+    }
+    /* ハンバーガーメニュー用 */
+    #menu-container {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      font-family: Arial, sans-serif;
+    }
+    #menu-btn {
+      font-size: 24px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      user-select: none;
+    }
+    #menu {
+      display: none; /* 初期は非表示 */
+      position: absolute;
+      top: 40px;
+      right: 0;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      width: 280px;
+      max-height: 400px;
+      overflow-y: auto;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      padding: 10px;
+    }
+    #menu h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 18px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 6px;
+    }
+    #reservation-list {
+      list-style: none;
+      padding-left: 0;
+      margin: 0;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+    #reservation-list li {
+      padding: 6px 4px;
+      border-bottom: 1px solid #ddd;
+      cursor: pointer;
+      user-select: none;
+    }
+    #reservation-list li:hover {
+      background-color: #eee;
+    }
+    #reservation-detail {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #333;
+      white-space: pre-line;
+    }
+    /* 追加：〇△✕の色分けクラス */
+    .status-〇 {
+      color: green;
+    }
+    .status-△ {
+      color: orange;
+    }
+    .status-✕ {
+      color: red;
+    }
+
+    /* ここからお知らせ欄のスタイル */
+    #notice-area {
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 10px;
+      border: 1px solid #999;
+      border-radius: 6px;
+      background-color: #fafafa;
+    }
+    #notice-area h3 {
+      margin-top: 0;
+      font-size: 18px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 6px;
+    }
+    #notice-content p {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<h1 style="text-align:center;">ゲーム予約システム</h1>
+
+<div id="login-area">
+  <input type="text" id="tiktokId" placeholder="TikTok ID" />
+  <input type="text" id="epicId" placeholder="Epic ID" />
+  <input type="text" id="subId" placeholder="サブスクID（任意）" />
+  <button id="login-btn">ログイン</button>
+  <button id="logout-btn" style="display:none;">ログアウト</button>
+  <p id="login-result"></p>
+</div>
+
+<!-- お知らせ欄をlogin-areaの下あたりに追加 -->
+<div id="notice-area">
+  <h3>お知らせ</h3>
+  <div id="notice-content">抽選結果の通知はこちらに表示されます。</div>
+</div>
+
+<!-- ハンバーガーメニュー -->
+<div id="menu-container">
+  <button id="menu-btn" aria-label="メニュー">&#9776;</button>
+  <div id="menu">
+    <h3>予約一覧</h3>
+    <ul id="reservation-list"></ul>
+    <div id="reservation-detail"></div>
+  </div>
+</div>
+
+<div id="calendar"></div>
+
+<div id="reserve-form" style="display:none;">
+  <h3>予約フォーム</h3>
+  <label>名前: <span id="display-name"></span></label><br/><br/>
+  <label>日付: <input type="date" id="reserve-date" readonly /></label><br/><br/>
+  <label>時間:
+    <select id="reserve-time">
+      <!-- 時間選択肢の例 -->
+      <option value="09:00-10:00">09:00〜10:00（1時間）</option>
+      <option value="10:00-11:00">10:00〜11:00（1時間）</option>
+      <option value="11:00-12:00">11:00〜12:00（1時間）</option>
+      <option value="09:00-11:00">09:00〜11:00（2時間）</option>
+      <option value="10:00-12:00">10:00〜12:00（2時間）</option>
+      <option value="09:00-12:00">09:00〜12:00（3時間）</option>
+    </select>
+  </label><br/><br/>
+  <button id="reserve-btn">予約する</button>
+  <button id="cancel-btn">予約キャンセル</button>
+  <p id="reserve-result"></p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<script src="main.js"></script>
+
+<script>
+  // ハンバーガーメニュー開閉処理
+  const menuBtn = document.getElementById('menu-btn');
+  const menu = document.getElementById('menu');
+  const reservationList = document.getElementById('reservation-list');
+  const reservationDetail = document.getElementById('reservation-detail');
+
+  menuBtn.addEventListener('click', () => {
+    if (menu.style.display === 'block') {
+      menu.style.display = 'none';
+    } else {
+      menu.style.display = 'block';
+      fetchReservationsAndShow();
+    }
+  });
+  
+</script>
+
+</body>
+</html>

@@ -1,0 +1,50 @@
+body {
+  font-family: Arial, sans-serif;
+  max-width: 700px;
+  margin: 20px auto;
+  padding: 0 10px;
+}
+
+#calendar {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.fc-daygrid-day-number {
+  font-weight: bold;
+}
+
+.status-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: bolder;
+  font-size: 2em;
+  pointer-events: none;
+}
+
+
+.status-〇 {
+  color: green;
+}
+
+.status-△ {
+  color: orange;
+}
+
+.status-✕ {
+  color: red;
+}
+
+#reservation-form input {
+  padding: 5px;
+  font-size: 1em;
+}
+
+#reservation-form button {
+  padding: 5px 10px;
+  font-size: 1em;
+  margin-left: 5px;
+  cursor: pointer;
+}
