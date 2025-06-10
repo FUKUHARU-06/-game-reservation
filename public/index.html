@@ -146,6 +146,42 @@
       margin: 6px 0;
       font-size: 14px;
     }
+     /* ログインフォームの親をflexで横並び（PC用） */
+  #login-area .input-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+
+  #login-area input {
+    margin: 0 5px;
+    padding: 5px;
+    width: 200px;
+  }
+
+  /* ボタンエリアも横並び */
+  #login-area .input-group button {
+    margin: 0 5px;
+  }
+
+  /* スマホ（幅600px以下）の場合は縦並びにする */
+  @media screen and (max-width: 600px) {
+    #login-area .input-group {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    #login-area input {
+      margin: 5px 0;
+      width: 100%;
+    }
+
+    #login-area .input-group button {
+      margin: 5px 0;
+      width: 100%;
+    }
+  }
   </style>
 </head>
 <body>

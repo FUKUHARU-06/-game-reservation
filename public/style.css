@@ -48,19 +48,95 @@ body {
   cursor: pointer;
 }
 
-/* ログインエリアのスタイル（スマホ対応） */
+/* ログインエリアのスタイル */
+/* PCでは横並び */
 #login-area {
-  text-align: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   padding: 15px;
+  gap: 10px;
+  text-align: center;
 }
 
-#login-area input,
-#login-area button {
-  margin: 5px 5px 10px 5px;
-  padding: 8px;
-  width: 100%;
-  max-width: 280px;
-  box-sizing: border-box;
-  display: block;
-  font-size: 1em;
+/* 各入力欄グループ */
+#login-area .input-group {
+  flex: 1 1 180px;
+  min-width: 150px;
+  margin-bottom: 12px;
+  text-align: center;
 }
+
+/* 入力欄 */
+#login-area input {
+  padding: 10px;
+  font-size: 1em;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ボタン */
+#login-area button {
+  margin: 5px 0 10px 0;
+  padding: 8px;
+  width: 150px;
+  box-sizing: border-box;
+  font-size: 1em;
+  cursor: pointer;
+  display: inline-block;
+}
+
+/* スマホ（600px以下）で縦並び */
+@media (max-width: 600px) {
+  #login-area {
+    display: block;
+  }
+  #login-area .input-group {
+    margin: 10px auto;
+    min-width: auto;
+    width: 100%;
+  }
+  #login-area input,
+  #login-area button {
+    width: 100%;
+    max-width: 280px;
+    display: block;
+    margin: 5px auto;
+  }
+}
+  /* ログインフォームの親をflexで横並び（PC用） */
+  #login-area .input-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+
+  #login-area input {
+    margin: 0 5px;
+    padding: 5px;
+    width: 200px;
+  }
+
+  /* ボタンエリアも横並び */
+  #login-area .input-group button {
+    margin: 0 5px;
+  }
+
+  /* スマホ（幅600px以下）の場合は縦並びにする */
+  @media screen and (max-width: 600px) {
+    #login-area .input-group {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    #login-area input {
+      margin: 5px 0;
+      width: 100%;
+    }
+
+    #login-area .input-group button {
+      margin: 5px 0;
+      width: 100%;
+    }
+  }

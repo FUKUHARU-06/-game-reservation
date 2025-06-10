@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const availableDates = {
     '2025-06-08': true,
     '2025-06-25': true,
-    '2025-06-26': true,
+    '2025-06-27': true,
     '2025-06-30': true,
   };
   function parseTimeRange(range) {
