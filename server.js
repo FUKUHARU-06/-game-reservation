@@ -15,7 +15,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
 }));
-
+// サブスクID登録
 const SUBSCRIBER_IDS = ['sub001', 'sub002', 'sub003'];
 const MAX_RESERVATIONS_PER_DAY = 3;
 const MAX_SUBSCRIBER_SLOTS = 2;

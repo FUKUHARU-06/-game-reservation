@@ -155,8 +155,18 @@ document.addEventListener('DOMContentLoaded', function () {
   async function checkSession() {
     const res = await fetch('/session');
     const data = await res.json();
+    const tiktokIdInput = document.getElementById('tiktokId');
+    const epicIdInput = document.getElementById('epicId');
+    const subIdInput = document.getElementById('subId');
     if (data.loggedIn) {
       currentUser = data.user;
+      tiktokIdInput.value = currentUser.tiktokId;
+      tiktokIdInput.disabled = true;
+      epicIdInput.value = currentUser.epicId;
+      epicIdInput.disabled = true;
+      subIdInput.value = currentUser.subId || '';
+      subIdInput.disabled = true;
+
       displayName.textContent = currentUser.tiktokId;
       loginBtn.style.display = 'none';
       logoutBtn.style.display = 'inline-block';
@@ -166,6 +176,13 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
       currentUser = null;
       displayName.textContent = '';
+      tiktokIdInput.disabled = false;
+      tiktokIdInput.value = '';
+      epicIdInput.disabled = false;
+      epicIdInput.value = '';
+      subIdInput.disabled = false;
+      subIdInput.value = '';
+
       loginBtn.style.display = 'inline-block';
       logoutBtn.style.display = 'none';
       reserveForm.style.display = 'none';
