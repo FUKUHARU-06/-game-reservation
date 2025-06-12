@@ -34,13 +34,13 @@ function parseTimeRange(timeRange) {
 
 // ログイン処理
 app.post('/login', (req, res) => {
-  const { tiktokId, epicId, subId } = req.body;
+  const { tiktokId, epicId, subId, accountType } = req.body;
   if (!tiktokId || !epicId) {
-    return res.json({ success: false, message: 'TikTok ID と Epic ID は必須です。' });
+    return res.json({ success: false, message: 'アカウント名 と Epic ID は必須です。' });
   }
 
   const hasSub = subId && SUBSCRIBER_IDS.includes(subId);
-  req.session.user = { tiktokId, epicId, subId, hasSub };
+  req.session.user = { tiktokId, epicId, subId, hasSub ,accountType: accountType || 'TikTok'};
   res.json({ success: true, hasSub, message: 'ログイン成功' });
 });
 
@@ -133,7 +133,6 @@ app.get('/reservations-summary', (req, res) => {
 app.post('/reserve', (req, res) => {
   const user = req.session.user;
   if (!user) return res.json({ message: '❌ ログインが必要です。' });
-
   const { date, time } = req.body;
   if (date === '2025-05-27') {
     return res.json({ message: '❌ 5/27は予約できません。' });
@@ -162,6 +161,7 @@ app.post('/reserve', (req, res) => {
         return res.json({ message: '❌ この日は満員です。' });
       }
       reservations.push({
+        accountType: user.accountType || 'TikTok',  // ← アカウント種別を追加
         name: user.tiktokId,
         epicId: user.epicId,
         subId: user.subId,
@@ -176,6 +176,7 @@ app.post('/reserve', (req, res) => {
       });
     } else {
       reservations.push({
+        accountType: user.accountType || 'TikTok',  // ← アカウント種別を追加
         name: user.tiktokId,
         epicId: user.epicId,
         subId: user.subId,

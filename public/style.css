@@ -64,7 +64,8 @@ body {
   flex-wrap: nowrap;
 }
 
-#login-area input {
+#login-area input,
+#login-area select {
   margin: 0 5px;
   padding: 5px;
   flex: 0 0 auto; /* 固定幅で横並び維持 */
@@ -104,6 +105,7 @@ body {
   }
 
   #login-area input,
+  #login-area select,
   #login-area button,
   #login-result {
     margin: 8px 0;

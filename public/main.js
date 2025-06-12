@@ -155,12 +155,14 @@ document.addEventListener('DOMContentLoaded', function () {
   async function checkSession() {
     const res = await fetch('/session');
     const data = await res.json();
-    const tiktokIdInput = document.getElementById('tiktokId');
+    const tiktokIdInput = document.getElementById('accountName');
+    const accountTypeSelect = document.getElementById('account-type');
     const epicIdInput = document.getElementById('epicId');
     const subIdInput = document.getElementById('subId');
     if (data.loggedIn) {
       currentUser = data.user;
       tiktokIdInput.value = currentUser.tiktokId;
+      accountTypeSelect.value = currentUser.accountType || 'tiktok';
       tiktokIdInput.disabled = true;
       epicIdInput.value = currentUser.epicId;
       epicIdInput.disabled = true;
@@ -198,19 +200,21 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   loginBtn.addEventListener('click', async () => {
-    const tiktokId = document.getElementById('tiktokId').value.trim();
+    const tiktokId = document.getElementById('accountName').value.trim();
+    const accountType = document.getElementById('account-type').value;
     const epicId = document.getElementById('epicId').value.trim();
     const subId = document.getElementById('subId').value.trim();
 
     if (!tiktokId || !epicId) {
-      alert('TikTok IDとEpic IDは必須です。');
+      alert('アカウント名とEpic IDは必須です。');
       return;
     }
 
     const res = await fetch('/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tiktokId, epicId, subId }),
+      body: JSON.stringify({ tiktokId, epicId, subId, accountType }),
+
     });
     const data = await res.json();
     if (data.success) {

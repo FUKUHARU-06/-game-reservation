@@ -182,20 +182,47 @@
       width: 100%;
     }
   }
+  /* スマホ（幅600px以下）の場合は縦並びにする */
+@media screen and (max-width: 600px) {
+  #login-area .input-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #login-area input,
+  #login-area select {
+    margin: 5px 0;
+    width: 100%;
+  }
+
+  #login-area .input-group button {
+    margin: 5px 0;
+    width: 100%;
+  }
+}
+
   </style>
 </head>
 <body>
 
 <h1 style="text-align:center;">ゲーム予約システム</h1>
 
+<!-- 該当箇所のみ抜粋して修正 -->
 <div id="login-area">
-  <input type="text" id="tiktokId" placeholder="TikTok ID" />
-  <input type="text" id="epicId" placeholder="Epic ID" />
-  <input type="text" id="subId" placeholder="サブスクID（任意）" />
-  <button id="login-btn">ログイン</button>
-  <button id="logout-btn" style="display:none;">ログアウト</button>
+  <div class="input-group">
+    <select id="account-type">
+      <option value="tiktok">TikTok</option>
+      <option value="youtube">YouTube</option>
+    </select>
+    <input type="text" id="accountName" placeholder="アカウント名" />
+    <input type="text" id="epicId" placeholder="Epic ID" />
+    <input type="text" id="subId" placeholder="サブスクID（任意）" />
+    <button id="login-btn">ログイン</button>
+    <button id="logout-btn" style="display:none;">ログアウト</button>
+  </div>
   <p id="login-result"></p>
 </div>
+
 
 
 
