@@ -30,9 +30,19 @@ document.addEventListener('DOMContentLoaded', function () {
   let calendar = null;
 
   const availableDates = {
-    '2025-06-08': true,
+    '2025-06-17': true,
+    '2025-06-18': true,
+    '2025-06-19': true,
+    '2025-06-20': true,
+    '2025-06-21': true,
+    '2025-06-22': true,
+    '2025-06-23': true,
+    '2025-06-24': true,
     '2025-06-25': true,
+    '2025-06-26': true,
     '2025-06-27': true,
+    '2025-06-28': true,
+    '2025-06-29': true,
     '2025-06-30': true,
   };
   function parseTimeRange(range) {
