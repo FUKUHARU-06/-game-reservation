@@ -3,10 +3,27 @@ const fs = require('fs');
 const path = require('path');
 const bodyParser = require('body-parser');
 const session = require('express-session');
+const sqlite3 = require('sqlite3').verbose();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const RESERVATIONS_FILE = path.join(__dirname, 'reservations.json');
+
+// SQLiteデータベース初期化
+const db = new sqlite3.Database(path.join(__dirname, 'reservations.db'));
+
+db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS reservations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    epicId TEXT,
+    subId TEXT,
+    hasSub INTEGER,
+    accountType TEXT,
+    date TEXT,
+    time TEXT,
+    status TEXT
+  )`);
+});
 
 app.use(bodyParser.json());
 app.use(express.static('public'));
@@ -15,12 +32,12 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
 }));
-// サブスクID登録
+
 const SUBSCRIBER_IDS = ['sub001', 'sub002', 'sub003'];
 const MAX_RESERVATIONS_PER_DAY = 3;
 const MAX_SUBSCRIBER_SLOTS = 2;
 
-// 時間帯文字列を1時間単位の配列に分解する関数
+// 時間帯文字列を1時間単位の配列に分解する関数（変更なし）
 function parseTimeRange(timeRange) {
   const [start, end] = timeRange.split('-');
   const startHour = parseInt(start.split(':')[0]);
@@ -32,7 +49,7 @@ function parseTimeRange(timeRange) {
   return hours;
 }
 
-// ログイン処理
+// ログイン処理（変更なし）
 app.post('/login', (req, res) => {
   const { tiktokId, epicId, subId, accountType } = req.body;
   if (!tiktokId || !epicId) {
@@ -40,18 +57,18 @@ app.post('/login', (req, res) => {
   }
 
   const hasSub = subId && SUBSCRIBER_IDS.includes(subId);
-  req.session.user = { tiktokId, epicId, subId, hasSub ,accountType: accountType || 'TikTok'};
+  req.session.user = { tiktokId, epicId, subId, hasSub, accountType: accountType || 'TikTok' };
   res.json({ success: true, hasSub, message: 'ログイン成功' });
 });
 
-// ログアウト
+// ログアウト（変更なし）
 app.get('/logout', (req, res) => {
   req.session.destroy(() => {
     res.json({ success: true, message: 'ログアウトしました' });
   });
 });
 
-// セッション情報取得
+// セッション情報取得（変更なし）
 app.get('/session', (req, res) => {
   if (req.session.user) {
     res.json({ loggedIn: true, user: req.session.user });
@@ -60,33 +77,33 @@ app.get('/session', (req, res) => {
   }
 });
 
-// 全予約取得
+// 全予約取得（SQLite対応）
 app.get('/reservations', (req, res) => {
-  fs.readFile(RESERVATIONS_FILE, (err, data) => {
-    if (err) return res.json([]);
-    try {
-      const reservations = JSON.parse(data);
-      res.json(reservations);
-    } catch {
-      res.json([]);
+  db.all('SELECT * FROM reservations', (err, rows) => {
+    if (err) {
+      console.error('DB取得エラー:', err);
+      return res.status(500).json([]);
     }
+    res.json(rows);
   });
 });
 
-// 自分の予約取得
+// 自分の予約取得（SQLite対応）
 app.get('/my-reservations', (req, res) => {
   const user = req.session.user;
   if (!user) return res.status(401).json([]);
 
-  fs.readFile(RESERVATIONS_FILE, (err, data) => {
-    if (err) return res.json([]);
-    const reservations = JSON.parse(data);
-    const myReservations = reservations.filter(r => r.name === user.tiktokId);
-    res.json(myReservations);
+  const sql = 'SELECT * FROM reservations WHERE name = ?';
+  db.all(sql, [user.tiktokId], (err, rows) => {
+    if (err) {
+      console.error('DBエラー:', err);
+      return res.status(500).json([]);
+    }
+    res.json(rows);
   });
 });
 
-// 空き時間取得
+// 空き時間取得（SQLite対応）
 app.get('/available-times', (req, res) => {
   const { date } = req.query;
 
@@ -99,12 +116,14 @@ app.get('/available-times', (req, res) => {
     "09:00-12:00",
   ];
 
-  fs.readFile(RESERVATIONS_FILE, (err, data) => {
-    if (err) return res.json({ available: timeSlots });
+  const sql = 'SELECT time FROM reservations WHERE date = ? AND status != ?';
+  db.all(sql, [date, 'rejected'], (err, rows) => {
+    if (err) {
+      console.error('DBエラー:', err);
+      return res.json({ available: timeSlots });
+    }
 
-    const reservations = JSON.parse(data).filter(r => r.date === date && r.status !== 'rejected');
-    const bookedHours = reservations.flatMap(r => parseTimeRange(r.time));
-
+    const bookedHours = rows.flatMap(r => parseTimeRange(r.time));
     const available = timeSlots.filter(slot => {
       const slotHours = parseTimeRange(slot);
       return !slotHours.some(h => bookedHours.includes(h));
@@ -114,142 +133,176 @@ app.get('/available-times', (req, res) => {
   });
 });
 
-// サマリー取得
+// サマリー取得（SQLite対応）
 app.get('/reservations-summary', (req, res) => {
-  fs.readFile(RESERVATIONS_FILE, (err, data) => {
-    if (err) return res.json({});
-    const reservations = JSON.parse(data);
+  const sql = `SELECT date, COUNT(*) AS count FROM reservations WHERE status != 'rejected' GROUP BY date`;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      console.error('DB読み込みエラー:', err);
+      return res.json({});
+    }
     const summary = {};
-    reservations.forEach(r => {
-      if (r.status === 'rejected') return;
-      if (!summary[r.date]) summary[r.date] = 0;
-      summary[r.date]++;
+    rows.forEach(row => {
+      summary[row.date] = row.count;
     });
     res.json(summary);
   });
 });
 
-// 予約登録
+// 予約登録（SQLite対応）
 app.post('/reserve', (req, res) => {
   const user = req.session.user;
   if (!user) return res.json({ message: '❌ ログインが必要です。' });
+
   const { date, time } = req.body;
   if (date === '2025-05-27') {
     return res.json({ message: '❌ 5/27は予約できません。' });
   }
 
-  fs.readFile(RESERVATIONS_FILE, (err, data) => {
-    const reservations = err ? [] : JSON.parse(data);
+  const checkSql = 'SELECT * FROM reservations WHERE date = ?';
+  db.all(checkSql, [date], (err, rows) => {
+    if (err) {
+      console.error('DB読み込みエラー:', err);
+      return res.json({ message: '❌ データ取得に失敗しました。' });
+    }
 
-    const duplicate = reservations.find(r => r.name === user.tiktokId && r.date === date);
+    // すでに同日に予約済みか確認
+    const duplicate = rows.find(r => r.name === user.tiktokId);
     if (duplicate) {
       return res.json({ message: '❌ すでにこの日に予約済みです。' });
     }
 
+    // 時間帯重複チェック
     const newHours = parseTimeRange(time);
-    const overlap = reservations.some(r => {
-      if (r.date !== date || r.status === 'rejected') return false;
+    const overlap = rows.some(r => {
+      if (r.status === 'rejected') return false;
       const existingHours = parseTimeRange(r.time);
       return existingHours.some(h => newHours.includes(h));
     });
 
-    const confirmedCount = reservations.filter(r => r.date === date && r.status === 'confirmed').length;
-    const subscriberCount = reservations.filter(r => r.date === date && r.status === 'confirmed' && SUBSCRIBER_IDS.includes(r.subId)).length;
+    if (overlap) {
+      return res.json({ message: '❌ その時間帯はすでに埋まっています。' });
+    }
 
+    // 予約数チェック
+    const confirmedCount = rows.filter(r => r.status === 'confirmed').length;
+    const subscriberCount = rows.filter(r => r.status === 'confirmed' && SUBSCRIBER_IDS.includes(r.subId)).length;
+
+    let status = 'pending';
     if (user.hasSub) {
       if (confirmedCount >= MAX_RESERVATIONS_PER_DAY || subscriberCount >= MAX_SUBSCRIBER_SLOTS) {
         return res.json({ message: '❌ この日は満員です。' });
       }
-      reservations.push({
-        accountType: user.accountType || 'TikTok',  // ← アカウント種別を追加
-        name: user.tiktokId,
-        epicId: user.epicId,
-        subId: user.subId,
-        hasSub: user.hasSub,
-        date,
-        time,
-        status: 'confirmed'
-      });
-      fs.writeFile(RESERVATIONS_FILE, JSON.stringify(reservations, null, 2), (err) => {
-        if (err) return res.json({ message: '❌ 予約保存に失敗しました。' });
-        res.json({ message: '✅ サブスク優先予約が完了しました。' });
-      });
-    } else {
-      reservations.push({
-        accountType: user.accountType || 'TikTok',  // ← アカウント種別を追加
-        name: user.tiktokId,
-        epicId: user.epicId,
-        subId: user.subId,
-        hasSub: user.hasSub,
-        date,
-        time,
-        status: 'pending'
-      });
-      fs.writeFile(RESERVATIONS_FILE, JSON.stringify(reservations, null, 2), (err) => {
-        if (err) return res.json({ message: '❌ 仮予約保存に失敗しました。' });
-        res.json({ message: '⏳ 抽選予約を受け付けました。結果は前日12:00以降に反映されます。' });
-      });
+      status = 'confirmed';
     }
+
+    const insertSql = `
+      INSERT INTO reservations (accountType, name, epicId, subId, hasSub, date, time, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    db.run(insertSql, [
+      user.accountType || 'TikTok',
+      user.tiktokId,
+      user.epicId,
+      user.subId,
+      user.hasSub ? 1 : 0,
+      date,
+      time,
+      status
+    ], function (err) {
+      if (err) {
+        console.error('予約保存失敗:', err);
+        return res.json({ message: '❌ 予約保存に失敗しました。' });
+      }
+
+      if (status === 'confirmed') {
+        res.json({ message: '✅ サブスク優先予約が完了しました。' });
+      } else {
+        res.json({ message: '⏳ 抽選予約を受け付けました。結果は前日12:00以降に反映されます。' });
+      }
+    });
   });
 });
 
-// 抽選結果一覧取得
+// 抽選結果一覧取得（SQLite対応）
 app.get('/lottery-results', (req, res) => {
-  fs.readFile(RESERVATIONS_FILE, (err, data) => {
-    if (err) return res.json([]);
-    const reservations = JSON.parse(data);
-    const results = reservations.filter(r => r.status === 'confirmed' || r.status === 'rejected');
-    res.json(results);
+  const sql = `SELECT * FROM reservations WHERE status = 'confirmed' OR status = 'rejected'`;
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      console.error('DB読み込みエラー:', err);
+      return res.json([]);
+    }
+    res.json(rows);
   });
 });
 
-// 予約キャンセル
+// 予約キャンセル（SQLite対応）
 app.post('/cancel', (req, res) => {
   const user = req.session.user;
   if (!user) return res.json({ message: '❌ ログインが必要です。' });
 
   const { date, time } = req.body;
-  fs.readFile(RESERVATIONS_FILE, (err, data) => {
-    if (err) return res.json({ message: '❌ 予約情報の読み込みに失敗しました。' });
 
-    let reservations;
-    try {
-      reservations = JSON.parse(data);
-    } catch {
-      return res.json({ message: '❌ 予約情報が壊れています。' });
+  const sql = 'DELETE FROM reservations WHERE name = ? AND date = ? AND time = ?';
+  db.run(sql, [user.tiktokId, date, time], function (err) {
+    if (err) {
+      console.error('キャンセル失敗:', err);
+      return res.json({ message: '❌ キャンセル処理に失敗しました。' });
     }
 
-    const index = reservations.findIndex(r => r.name === user.tiktokId && r.date === date && r.time === time);
-    if (index === -1) return res.json({ message: '❌ 該当の予約が見つかりません。' });
+    if (this.changes === 0) {
+      return res.json({ message: '❌ 該当の予約が見つかりません。' });
+    }
 
-    reservations.splice(index, 1);
-    fs.writeFile(RESERVATIONS_FILE, JSON.stringify(reservations, null, 2), (err) => {
-      if (err) return res.json({ message: '❌ キャンセル保存に失敗しました。' });
-      res.json({ message: '✅ 予約をキャンセルしました。' });
-    });
+    res.json({ message: '✅ 予約をキャンセルしました。' });
   });
 });
 
-// 抽選処理
+// 今日の抽選結果取得（SQLite対応）
+app.get('/my-today-result', (req, res) => {
+  const user = req.session.user;
+  if (!user) return res.json({ status: 'none' });
+
+  const today = new Date().toISOString().split('T')[0];
+  const sql = `SELECT status, time FROM reservations WHERE name = ? AND date = ? LIMIT 1`;
+
+  db.get(sql, [user.tiktokId, today], (err, row) => {
+    if (err) {
+      console.error('DBエラー:', err);
+      return res.json({ status: 'none' });
+    }
+    if (!row) return res.json({ status: 'none' });
+
+    res.json({ status: row.status, time: row.time });
+  });
+});
+
+// 配列シャッフル用関数（変更なし）
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+}
+
+// 抽選処理（SQLite対応）
 function runLottery() {
   const now = new Date();
-  const today = now.toISOString().split('T')[0];
 
   const targetDate = new Date(now);
   targetDate.setDate(targetDate.getDate() + 1);
   const targetDateStr = targetDate.toISOString().split('T')[0];
 
   if (now.getHours() === 12 && now.getMinutes() === 0) {
-    fs.readFile(RESERVATIONS_FILE, (err, data) => {
-      if (err) return;
-      let reservations = JSON.parse(data);
+    const sql = `SELECT * FROM reservations WHERE date = ?`;
+    db.all(sql, [targetDateStr], (err, allRows) => {
+      if (err) return console.error('抽選DB読み込み失敗:', err);
 
-      const pending = reservations.filter(r => r.date === targetDateStr && r.status === 'pending');
+      const pending = allRows.filter(r => r.status === 'pending');
       if (pending.length === 0) return;
 
-      const confirmed = reservations.filter(r => r.date === targetDateStr && r.status === 'confirmed');
+      const confirmed = allRows.filter(r => r.status === 'confirmed');
       const alreadyConfirmed = confirmed.length;
-
       const subscriberConfirmed = confirmed.filter(r => SUBSCRIBER_IDS.includes(r.subId)).length;
       const availableSlots = MAX_RESERVATIONS_PER_DAY - alreadyConfirmed;
 
@@ -257,30 +310,38 @@ function runLottery() {
       shuffleArray(candidates);
 
       let confirmedCount = 0;
+      const updates = [];
+
       for (let r of candidates) {
-        if (confirmedCount < availableSlots) {
-          r.status = 'confirmed';
-          confirmedCount++;
-        } else {
-          r.status = 'rejected';
-        }
+        const newStatus = confirmedCount < availableSlots ? 'confirmed' : 'rejected';
+        if (newStatus === 'confirmed') confirmedCount++;
+
+        updates.push({
+          id: r.id,
+          status: newStatus
+        });
       }
 
-      fs.writeFile(RESERVATIONS_FILE, JSON.stringify(reservations, null, 2), () => {});
+      // 一括更新（トランザクションで安全に）
+      db.serialize(() => {
+        db.run("BEGIN TRANSACTION");
+        updates.forEach(u => {
+          db.run(`UPDATE reservations SET status = ? WHERE id = ?`, [u.status, u.id]);
+        });
+        db.run("COMMIT");
+      });
 
-      // 🎯 抽選ログ保存
+      // 🎯 抽選ログ保存（オプション）
       const logEntry = {
         executedAt: now.toISOString(),
         targetDate: targetDateStr,
-        results: resultLog,
+        results: updates
       };
       const logPath = path.join(__dirname, 'lottery.log.json');
       fs.readFile(logPath, (err, data) => {
         let logs = [];
         if (!err && data.length > 0) {
-          try {
-            logs = JSON.parse(data);
-          } catch {}
+          try { logs = JSON.parse(data); } catch {}
         }
         logs.push(logEntry);
         fs.writeFile(logPath, JSON.stringify(logs, null, 2), () => {});
@@ -288,31 +349,6 @@ function runLottery() {
     });
   }
 }
-
-// 配列シャッフル用関数
-function shuffleArray(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-}
-// 自分の今日の抽選結果取得（ログイン中のユーザー向け）
-app.get('/my-today-result', (req, res) => {
-  const user = req.session.user;
-  if (!user) return res.json({ status: 'none' });
-
-  const today = new Date().toISOString().split('T')[0];
-
-  fs.readFile(RESERVATIONS_FILE, (err, data) => {
-    if (err) return res.json({ status: 'none' });
-    const reservations = JSON.parse(data);
-    const my = reservations.find(r => r.name === user.tiktokId && r.date === today);
-    if (!my) return res.json({ status: 'none' });
-
-    res.json({ status: my.status, time: my.time });
-  });
-});
-
 
 // 抽選処理は1分ごとにチェック
 setInterval(runLottery, 60 * 1000);
