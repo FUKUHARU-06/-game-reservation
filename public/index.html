@@ -252,27 +252,25 @@
   const reservationList = document.getElementById('reservation-list');
   const reservationDetail = document.getElementById('reservation-detail');
 
-  menuBtn.addEventListener('click', () => {
+  menuBtn.addEventListener('click', async () => {
     if (menu.style.display === 'block') {
       menu.style.display = 'none';
+      reservationList.innerHTML = '';
+      reservationDetail.textContent = '';
     } else {
       menu.style.display = 'block';
-      fetchReservationsAndShow();
+      await fetchReservationsAndShow();
     }
   });
 
-  // 予約一覧取得＋表示関数（既存の fetchReservationsAndShow を想定）
   async function fetchReservationsAndShow() {
     try {
-      // 管理者なら管理者用APIを使い、それ以外は自分の予約のみを取得
       const resSession = await fetch('/session');
       const sessionData = await resSession.json();
-      let url = '/my-reservations';
-      if (sessionData.loggedIn && sessionData.user.tiktokId === 'admin') {
-        url = '/admin/reservations';
-      }
 
-      const res = await fetch(url);
+      const isAdmin = sessionData.loggedIn && sessionData.user.tiktokId === 'admin';
+
+      const res = await fetch(isAdmin ? '/admin/reservations' : '/my-reservations');
       const reservations = await res.json();
 
       reservationList.innerHTML = '';
@@ -283,31 +281,70 @@
         return;
       }
 
-      reservations.forEach(r => {
+      reservations.forEach((r, index) => {
         const li = document.createElement('li');
-        const statusMark = (r.status === 'confirmed') ? '〇' :
-                           (r.status === 'pending') ? '△' :
-                           (r.status === 'rejected') ? '✕' : '';
-        li.textContent = `${r.date} ${r.time} - ${r.name} [${statusMark}]`;
-        li.classList.add(`status-${statusMark}`);
 
-        li.addEventListener('click', () => {
-          reservationDetail.textContent =
-            `名前: ${r.name}\n` +
-            `Epic ID: ${r.epicId}\n` +
-            `サブスクID: ${r.subId || 'なし'}\n` +
-            `アカウント種別: ${r.accountType}\n` +
-            `日付: ${r.date}\n` +
-            `時間: ${r.time}\n` +
-            `状態: ${r.status}`;
-        });
+        if (isAdmin) {
+          // 管理者用UI（全員の予約を表示、キャンセルボタンなし）
+          const statusMark = (r.status === 'confirmed') ? '〇' :
+                             (r.status === 'pending') ? '△' :
+                             (r.status === 'rejected') ? '✕' : '';
+          li.textContent = `${r.date} ${r.time} - ${r.name} [${statusMark}]`;
+          li.classList.add(`status-${statusMark}`);
+          li.addEventListener('click', () => {
+            reservationDetail.textContent =
+              `名前: ${r.name}\n` +
+              `Epic ID: ${r.epicId}\n` +
+              `サブスクID: ${r.subId || 'なし'}\n` +
+              `アカウント種別: ${r.accountType}\n` +
+              `日付: ${r.date}\n` +
+              `時間: ${r.time}\n` +
+              `状態: ${r.status}`;
+          });
+        } else {
+          // 一般ユーザー用UI（キャンセルボタン付き）
+          const statusLabel = r.status === 'pending' ? '⏳抽選待ち' :
+                              r.status === 'confirmed' ? '✅確定' :
+                              r.status === 'rejected' ? '❌落選' : '';
+          li.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="flex-grow: 1; cursor: pointer;" data-index="${index}">
+                ${r.date} ${r.time} ${statusLabel}
+              </span>
+              <button class="cancel-inline-btn" style="font-size: 12px; padding: 2px 6px;" data-date="${r.date}" data-time="${r.time}">キャンセル</button>
+            </div>
+          `;
+          li.querySelector('span').addEventListener('click', () => {
+            reservationDetail.textContent = `予約日時: ${r.date} ${r.time}\n状態: ${statusLabel}\nEpic ID: ${r.epicId}`;
+          });
+          li.querySelector('.cancel-inline-btn').addEventListener('click', async () => {
+            const confirmCancel = confirm(`「${r.date} ${r.time}」の予約を本当にキャンセルしますか？`);
+            if (!confirmCancel) return;
+            const res = await fetch('/cancel', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ date: r.date, time: r.time })
+            });
+            const result = await res.json();
+            alert(result.message);
+            await fetchReservationsAndShow();
+          });
+        }
+
         reservationList.appendChild(li);
       });
+
+      // 最初の予約の詳細を表示（一般のみ）
+      if (!isAdmin) {
+        reservationDetail.textContent = `予約日時: ${reservations[0].date} ${reservations[0].time}`;
+      }
+
     } catch (e) {
       reservationList.innerHTML = '<li>予約情報の取得に失敗しました。</li>';
     }
   }
 </script>
+
 
 </body>
 </html>
