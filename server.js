@@ -4,6 +4,8 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const sqlite3 = require('sqlite3').verbose();
+// node-fetch をインストール済みと仮定
+const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -292,6 +294,18 @@ function runAsync(db, sql, params=[]) {
   });
 }
 
+// Discord Webhook URLをグローバル定義（安全な方法で管理推奨）
+const webhookUrl = 'https://discord.com/api/webhooks/1385535108143911003/mOjAX4c0kBjf-KMEYiPZNJxiACRBIJsKwiSP1N01fpRik7asfQTnwBrjged1sW-bWwST';
+
+// Discord通知関数（グローバルに1回だけ定義）
+function notifyDiscord(message) {
+  fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: message }),
+  }).catch(err => console.error('Discord通知失敗:', err));
+}
+
 // 抽選処理（12時以降かつ未実行なら実行し、一度実行したら当日は二重実行しない）
 async function runLottery() {
   const now = new Date();
@@ -383,6 +397,9 @@ async function runLottery() {
       logs.push(logEntry);
       fs.writeFile(logPath, JSON.stringify(logs, null, 2), () => {});
     });
+
+    // Discord通知
+    notifyDiscord(`✅ ${targetDateStr} の抽選が完了しました。結果はサイト上で確認できます。`);
   });
 }
 
