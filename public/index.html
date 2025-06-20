@@ -154,7 +154,8 @@
     margin-bottom: 10px;
   }
 
-  #login-area input {
+  #login-area input,
+  #login-area select {
     margin: 0 5px;
     padding: 5px;
     width: 200px;
@@ -172,9 +173,10 @@
       align-items: stretch;
     }
 
-    #login-area input {
+    #login-area input,
+    #login-area select {
       margin: 5px 0;
-      width: 100%;
+      width: 96%;
     }
 
     #login-area .input-group button {
@@ -182,37 +184,18 @@
       width: 100%;
     }
   }
-  /* スマホ（幅600px以下）の場合は縦並びにする */
-@media screen and (max-width: 600px) {
-  #login-area .input-group {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  #login-area input,
-  #login-area select {
-    margin: 5px 0;
-    width: 96%;
-  }
-
-  #login-area .input-group button {
-    margin: 5px 0;
-    width: 100%;
-  }
-}
-
   </style>
 </head>
 <body>
 
 <h1 style="text-align:center;">ゲーム予約システム</h1>
 
-<!-- 該当箇所のみ抜粋して修正 -->
+<!-- 修正：id変更とボタン表示切替のためのid追加 -->
 <div id="login-area">
   <div class="input-group">
     <select id="account-type">
-      <option value="tiktok">TikTok</option>
-      <option value="youtube">YouTube</option>
+      <option value="TikTok">TikTok</option>
+      <option value="YouTube">YouTube</option>
     </select>
     <input type="text" id="accountName" placeholder="アカウント名" />
     <input type="text" id="epicId" placeholder="Epic ID" />
@@ -223,10 +206,7 @@
   <p id="login-result"></p>
 </div>
 
-
-
-
-<!-- お知らせ欄をlogin-areaの下あたりに追加 -->
+<!-- お知らせ欄 -->
 <div id="notice-area">
   <h3>お知らせ</h3>
   <div id="notice-content">抽選結果の通知はこちらに表示されます。</div>
@@ -250,7 +230,6 @@
   <label>日付: <input type="date" id="reserve-date" readonly /></label><br/><br/>
   <label>時間:
     <select id="reserve-time">
-      <!-- 時間選択肢の例 -->
       <option value="09:00-10:00">09:00〜10:00（1時間）</option>
       <option value="10:00-11:00">10:00〜11:00（1時間）</option>
       <option value="11:00-12:00">11:00〜12:00（1時間）</option>
@@ -282,7 +261,53 @@
       fetchReservationsAndShow();
     }
   });
-  
+
+  // 予約一覧取得＋表示関数（既存の fetchReservationsAndShow を想定）
+  async function fetchReservationsAndShow() {
+    try {
+      // 管理者なら管理者用APIを使い、それ以外は自分の予約のみを取得
+      const resSession = await fetch('/session');
+      const sessionData = await resSession.json();
+      let url = '/my-reservations';
+      if (sessionData.loggedIn && sessionData.user.tiktokId === 'admin') {
+        url = '/admin/reservations';
+      }
+
+      const res = await fetch(url);
+      const reservations = await res.json();
+
+      reservationList.innerHTML = '';
+      reservationDetail.textContent = '';
+
+      if (!reservations || reservations.length === 0) {
+        reservationList.innerHTML = '<li>予約はありません。</li>';
+        return;
+      }
+
+      reservations.forEach(r => {
+        const li = document.createElement('li');
+        const statusMark = (r.status === 'confirmed') ? '〇' :
+                           (r.status === 'pending') ? '△' :
+                           (r.status === 'rejected') ? '✕' : '';
+        li.textContent = `${r.date} ${r.time} - ${r.name} [${statusMark}]`;
+        li.classList.add(`status-${statusMark}`);
+
+        li.addEventListener('click', () => {
+          reservationDetail.textContent =
+            `名前: ${r.name}\n` +
+            `Epic ID: ${r.epicId}\n` +
+            `サブスクID: ${r.subId || 'なし'}\n` +
+            `アカウント種別: ${r.accountType}\n` +
+            `日付: ${r.date}\n` +
+            `時間: ${r.time}\n` +
+            `状態: ${r.status}`;
+        });
+        reservationList.appendChild(li);
+      });
+    } catch (e) {
+      reservationList.innerHTML = '<li>予約情報の取得に失敗しました。</li>';
+    }
+  }
 </script>
 
 </body>
