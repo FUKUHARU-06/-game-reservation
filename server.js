@@ -241,6 +241,20 @@ app.get('/lottery-results', (req, res) => {
     res.json(rows);
   });
 });
+// 強制抽選実行（管理者専用）
+app.post('/admin/force-lottery', (req, res) => {
+  const user = req.session.user;
+  if (!isAdmin(user)) {
+    return res.status(403).json({ message: '管理者専用エンドポイントです' });
+  }
+  runLottery()
+    .then(() => res.json({ message: '✅ 抽選を強制実行しました' }))
+    .catch((err) => {
+      console.error('強制抽選エラー:', err);
+      res.status(500).json({ message: '❌ 抽選実行中にエラーが発生しました' });
+    });
+});
+
 
 // 予約キャンセル
 app.post('/cancel', (req, res) => {

@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "executedAt": "2025-06-21T03:15:57.369Z",
+    "targetDate": "2025-06-22",
+    "results": [
+      {
+        "id": 17,
+        "name": "い",
+        "status": "confirmed"
+      },
+      {
+        "id": 12,
+        "name": "あ",
+        "status": "rejected"
+      },
+      {
+        "id": 16,
+        "name": "え",
+        "status": "rejected"
+      }
+    ]
+  }
+]
