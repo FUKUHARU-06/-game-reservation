@@ -311,13 +311,87 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     menu.classList.toggle('hidden');
 
+    //if (!menu.classList.contains('hidden')) {
+      //await fetchAndDisplayMyReservations();
     if (!menu.classList.contains('hidden')) {
-      await fetchAndDisplayMyReservations();
+      if (currentUser.tiktokId === 'admin') {
+        await fetchAndDisplayAllReservations(); // 管理者用全表示
+
+        // 10秒おきに自動更新（すでにある場合はクリア）
+      if (adminAutoRefreshInterval) clearInterval(adminAutoRefreshInterval);
+      adminAutoRefreshInterval = setInterval(() => {
+        fetchAndDisplayAllReservations();
+      }, 10000); // 10000ms = 10秒
+    } else {
+      await fetchAndDisplayMyReservations();  // 一般ユーザー用
+    }
     } else {
       reservationList.innerHTML = '';
       reservationDetail.innerHTML = '';
+      if (adminAutoRefreshInterval) {
+      clearInterval(adminAutoRefreshInterval);
+      adminAutoRefreshInterval = null;
+    }
     }
   });
+  async function fetchAndDisplayAllReservations() {
+  reservationList.innerHTML = '';
+  reservationDetail.innerHTML = '';
+  
+
+  try {
+    const res = await fetch('/admin/reservations');
+    if (!res.ok) throw new Error('全予約取得失敗');
+    const reservations = await res.json();
+
+    if (reservations.length === 0) {
+      const li = document.createElement('li');
+      li.textContent = '予約はありません。';
+      reservationList.appendChild(li);
+      return;
+    }
+
+    reservations.forEach((r, index) => {
+      const li = document.createElement('li');
+      const statusLabel = r.status === 'pending' ? '⏳抽選待ち' :
+                          r.status === 'confirmed' ? '✅確定' :
+                          r.status === 'rejected' ? '❌落選' : '';
+
+      li.innerHTML = `
+        <div style="padding: 4px;">
+          <span style="cursor: pointer;" data-index="${index}">
+            ${r.name}｜${r.date} ${r.time}｜${statusLabel}
+          </span>
+        </div>
+      `;
+
+      li.querySelector('span').addEventListener('click', () => {
+        showAdminReservationDetail(r);
+      });
+
+      reservationList.appendChild(li);
+    });
+
+    showAdminReservationDetail(reservations[0]);
+  } catch {
+    const li = document.createElement('li');
+    li.textContent = '予約一覧の取得に失敗しました。';
+    reservationList.appendChild(li);
+  }
+}
+function showAdminReservationDetail(reservation) {
+  const statusLabel = reservation.status === 'pending' ? '⏳抽選待ち' :
+                      reservation.status === 'confirmed' ? '✅確定' :
+                      reservation.status === 'rejected' ? '❌落選' : '';
+  reservationDetail.innerHTML = `
+    <p><strong>ユーザー：</strong>${reservation.name}</p>
+    <p><strong>予約日時：</strong>${reservation.date} ${reservation.time} ${statusLabel}</p>
+    <p><strong>Epic ID：</strong>${reservation.epicId}</p>
+    <p><strong>Sub ID：</strong>${reservation.subId}</p>
+    <p><strong>サブスク：</strong>${reservation.hasSub ? '有' : '無'}</p>
+  `;
+}
+
 
   async function fetchAndDisplayMyReservations() {
   reservationList.innerHTML = '';

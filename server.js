@@ -185,7 +185,7 @@ app.post('/reserve', (req, res) => {
     if (duplicate) {
       return res.json({ message: '❌ すでにこの日に予約済みです。' });
     }
-    const newHours = parseTimeRange(time);
+    /*const newHours = parseTimeRange(time);
     const overlap = rows.some(r => {
       if (r.status === 'rejected') return false;
       const existingHours = parseTimeRange(r.time);
@@ -193,7 +193,7 @@ app.post('/reserve', (req, res) => {
     });
     if (overlap) {
       return res.json({ message: '❌ その時間帯はすでに埋まっています。' });
-    }
+    }*/
     const confirmedCount = rows.filter(r => r.status === 'confirmed').length;
     const subscriberCount = rows.filter(r => r.status === 'confirmed' && SUBSCRIBER_IDS.includes(r.subId)).length;
     let status = 'pending';
@@ -358,6 +358,7 @@ async function runLottery() {
       if (newStatus === 'confirmed') confirmedCount++;
       updates.push({
         id: r.id,
+        name: r.name,
         status: newStatus
       });
     }
@@ -390,16 +391,27 @@ async function runLottery() {
     };
     const logPath = path.join(__dirname, 'lottery.log.json');
     fs.readFile(logPath, (err, data) => {
-      let logs = [];
-      if (!err && data.length > 0) {
-        try { logs = JSON.parse(data); } catch {}
-      }
-      logs.push(logEntry);
-      fs.writeFile(logPath, JSON.stringify(logs, null, 2), () => {});
-    });
+  let logs = [];
+  if (!err && data.length > 0) {
+    try { logs = JSON.parse(data); } catch {}
+  }
+  logs.push(logEntry);
+  fs.writeFile(logPath, JSON.stringify(logs, null, 2), () => {
 
-    // Discord通知
-    notifyDiscord(`✅ ${targetDateStr} の抽選が完了しました。結果はサイト上で確認できます。`);
+    // ✅ 抽選ログ書き込みが終わった後にDiscord通知
+    const confirmedUsers = updates.filter(u => u.status === 'confirmed').map(u => u.name);
+    const rejectedUsers = updates.filter(u => u.status === 'rejected').map(u => u.name);
+
+    let message = `🎯 ${targetDateStr} 抽選結果\n`;
+    message += `✅ 当選: ${confirmedUsers.length > 0 ? confirmedUsers.join(', ') : 'なし'}\n`;
+    message += `❌ 落選: ${rejectedUsers.length > 0 ? rejectedUsers.join(', ') : 'なし'}`;
+
+    notifyDiscord(message); // ← ここで通知を送る
+
+  });
+});
+
+
   });
 }
 
