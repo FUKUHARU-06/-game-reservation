@@ -275,6 +275,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     const data = await res.json();
     reserveResult.textContent = data.message;
+    await showTodayResult();
     calendar.refetchEvents();
     renderStatusLabels();
   });
@@ -300,6 +301,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     const data = await res.json();
     reserveResult.textContent = data.message;
+    await showTodayResult();
     calendar.refetchEvents();
     renderStatusLabels();
   });
