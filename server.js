@@ -402,7 +402,7 @@ async function runLottery() {
     const confirmedUsers = updates.filter(u => u.status === 'confirmed').map(u => u.name);
     const rejectedUsers = updates.filter(u => u.status === 'rejected').map(u => u.name);
 
-    let message = `🎯 ${targetDateStr} 抽選結果\n`;
+    let message = `@everyone\n🎯 ${targetDateStr} 抽選結果\n`;
     message += `✅ 当選: ${confirmedUsers.length > 0 ? confirmedUsers.join(', ') : 'なし'}\n`;
     message += `❌ 落選: ${rejectedUsers.length > 0 ? rejectedUsers.join(', ') : 'なし'}`;
 
