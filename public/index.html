@@ -262,32 +262,53 @@
   //     await fetchReservationsAndShow();
   //   }
   // });
-  menuBtn.addEventListener('click', () => {
-    if (menu.style.display === 'block') {
+ menuBtn.addEventListener('click', async () => {
+  if (menu.style.display === 'block') {
+    menu.style.display = 'none';
+  } else {
+    menu.style.display = 'block';
+    await fetchReservationsAndShow(); // ← ここ重要
+  }
+});
+
+
+// ✅ メニュー外クリックでメニューを閉じる
+  document.addEventListener('click', (event) => {
+    if (!menu.contains(event.target) && !menuBtn.contains(event.target)) {
       menu.style.display = 'none';
-    } else {
-      menu.style.display = 'block';
-      fetchReservationsAndShow();
+    }
+  });
+  
+  // ✅ ログイン済みなら予約一覧を初期表示
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const resSession = await fetch('/session');
+      const sessionData = await resSession.json();
+      if (sessionData.loggedIn) {
+        fetchReservationsAndShow();
+      }
+    } catch (e) {
+      console.error('セッション確認失敗', e);
     }
   });
 
-  // async function fetchReservationsAndShow() {
-  //   try {
-  //     const resSession = await fetch('/session');
-  //     const sessionData = await resSession.json();
 
-  //     const isAdmin = sessionData.loggedIn && sessionData.user.tiktokId === 'admin';
+  async function fetchReservationsAndShow() {
+    try {
+      const resSession = await fetch('/session');
+      const sessionData = await resSession.json();
+      const isAdmin = sessionData.loggedIn && sessionData.user.tiktokId === 'admin';
 
-  //     const res = await fetch(isAdmin ? '/admin/reservations' : '/my-reservations');
-  //     const reservations = await res.json();
+      const res = await fetch(isAdmin ? '/admin/reservations' : '/my-reservations');
+      const reservations = await res.json();
 
-  //     reservationList.innerHTML = '';
-  //     reservationDetail.textContent = '';
+      reservationList.innerHTML = '';
+      reservationDetail.textContent = '';
 
-  //     if (!reservations || reservations.length === 0) {
-  //       reservationList.innerHTML = '<li>予約はありません。</li>';
-  //       return;
-  //     }
+      if (!reservations || reservations.length === 0) {
+        reservationList.innerHTML = '<li>予約はありません。</li>';
+        return;
+      }
 
       reservations.forEach((r, index) => {
         const li = document.createElement('li');
@@ -302,41 +323,42 @@
           li.addEventListener('click', () => {
             reservationDetail.textContent =
               `名前: ${r.name}\n` +
-              `Epic ID: ${r.epicId}\n` +
-              `サブスクID: ${r.subId || 'なし'}\n` +
-              `アカウント種別: ${r.accountType}\n` +
+              `Epic ID: ${r.epicid}\n` +
+              `サブスクID: ${r.subid || 'なし'}\n` +
+              `アカウント種別: ${r.accounttype}\n` +
               `日付: ${r.date}\n` +
               `時間: ${r.time}\n` +
               `状態: ${r.status}`;
           });
-        // } else {
+         } else {
         //   // 一般ユーザー用UI（キャンセルボタン付き）
-        //   const statusLabel = r.status === 'pending' ? '⏳抽選待ち' :
-        //                       r.status === 'confirmed' ? '✅確定' :
-        //                       r.status === 'rejected' ? '❌落選' : '';
-        //   li.innerHTML = `
-        //     <div style="display: flex; justify-content: space-between; align-items: center;">
-        //       <span style="flex-grow: 1; cursor: pointer;" data-index="${index}">
-        //         ${r.date} ${r.time} ${statusLabel}
-        //       </span>
-        //       <button class="cancel-inline-btn" style="font-size: 12px; padding: 2px 6px;" data-date="${r.date}" data-time="${r.time}">キャンセル</button>
-        //     </div>
-        //   `;
-        //   li.querySelector('span').addEventListener('click', () => {
-        //     reservationDetail.textContent = `予約日時: ${r.date} ${r.time}\n状態: ${statusLabel}\nEpic ID: ${r.epicId}`;
-        //   });
-        //   li.querySelector('.cancel-inline-btn').addEventListener('click', async () => {
-        //     const confirmCancel = confirm(`「${r.date} ${r.time}」の予約を本当にキャンセルしますか？`);
-        //     if (!confirmCancel) return;
-        //     const res = await fetch('/cancel', {
-        //       method: 'POST',
-        //       headers: { 'Content-Type': 'application/json' },
-        //       body: JSON.stringify({ date: r.date, time: r.time })
-        //     });
-        //     const result = await res.json();
-        //     alert(result.message);
-        //     await fetchReservationsAndShow();
-        //   });
+           const statusLabel = r.status === 'pending' ? '⏳抽選待ち' :
+                               r.status === 'confirmed' ? '✅確定' :
+                               r.status === 'rejected' ? '❌落選' : '';
+           li.innerHTML = `
+             <div style="display: flex; justify-content: space-between; align-items: center;">
+               <span style="flex-grow: 1; cursor: pointer;" data-index="${index}">
+                 ${r.date} ${r.time} ${statusLabel}
+               </span>
+               <button class="cancel-inline-btn" style="font-size: 12px; padding: 2px 6px;" data-date="${r.date}" data-time="${r.time}">キャンセル</button>
+             </div>
+           `;
+           li.querySelector('span').addEventListener('click', () => {
+             reservationDetail.textContent = `予約日時: ${r.date} ${r.time}\n状態: ${statusLabel}\nEpic ID: ${r.epicid}`;
+           });
+           li.querySelector('.cancel-inline-btn').addEventListener('click', async () => {
+             const confirmCancel = confirm(`「${r.date} ${r.time}」の予約を本当にキャンセルしますか？`);
+             if (!confirmCancel) return;
+             const res = await fetch('/cancel', {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ date: r.date, time: r.time })
+             });
+             const result = await res.json();
+             alert(result.message);
+             await fetchReservationsAndShow();
+             renderStatusLabels();
+           });
         }
 
         reservationList.appendChild(li);
@@ -347,10 +369,10 @@
         reservationDetail.textContent = `予約日時: ${reservations[0].date} ${reservations[0].time}`;
       }
 
-    //} catch (e) {
-      //reservationList.innerHTML = '<li>予約情報の取得に失敗しました。</li>';
-    //}
-  //}
+    } catch (e) {
+      reservationList.innerHTML = '<li>予約情報の取得に失敗しました。</li>';
+    }
+  }
 </script>
 
 

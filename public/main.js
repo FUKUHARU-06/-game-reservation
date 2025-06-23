@@ -910,9 +910,10 @@ document.addEventListener('DOMContentLoaded', function () {
     reservationDetail.innerHTML = `
       <p><strong>ユーザー：</strong>${reservation.name}</p>
       <p><strong>予約日時：</strong>${reservation.date} ${reservation.time} ${statusLabel}</p>
-      <p><strong>Epic ID：</strong>${reservation.epicId}</p>
-      <p><strong>Sub ID：</strong>${reservation.subId}</p>
-      <p><strong>サブスク：</strong>${reservation.hasSub ? '有' : '無'}</p>
+      <p><strong>Epic ID：</strong>${reservation.epicid}</p>
+      <p><strong>Sub ID：</strong>${reservation.subid}</p>
+      <p><strong>サブスク：</strong>${reservation.hassub ? '有' : '無'}</p>
+      <p><strong>アカウント：</strong>${reservation.accounttype}</p>
     `;
   }
 
