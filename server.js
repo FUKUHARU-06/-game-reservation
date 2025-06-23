@@ -439,6 +439,16 @@ async function runLottery() {
   });
 }
 
+// Discord Webhook テスト用（管理者専用）
+app.get('/admin/test-webhook', (req, res) => {
+  const user = req.session.user;
+  if (!isAdmin(user)) return res.status(403).send('管理者権限が必要です');
+
+  const testMessage = '✅ Discord Webhook テスト送信（' + new Date().toLocaleString() + '）';
+  notifyDiscord(testMessage);
+  res.send('✅ テスト通知を送信しました！');
+});
+
 // 管理者専用 抽選強制実行API
 app.post('/admin/force-lottery', async (req, res) => {
   const user = req.session.user;
