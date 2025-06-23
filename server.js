@@ -1,33 +1,23 @@
+require('dotenv').config();
+
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const bodyParser = require('body-parser');
 const session = require('express-session');
-const sqlite3 = require('sqlite3').verbose();
 // node-fetch をインストール済みと仮定
 const fetch = require('node-fetch');
+
+// Supabaseクライアント
+const { createClient } = require('@supabase/supabase-js');
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// SQLiteデータベース初期化
-const db = new sqlite3.Database(path.join(__dirname, 'reservations.db'));
-
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS reservations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    epicId TEXT,
-    subId TEXT,
-    hasSub INTEGER,
-    accountType TEXT,
-    date TEXT,
-    time TEXT,
-    status TEXT
-  )`);
-});
-
-// --- ロック用のファイルパス（抽選実行管理用） ---
+// --- 抽選実行ロック用ファイルパス ---
 const lotteryLockFile = path.join(__dirname, 'lottery_last_run.txt');
 
 app.use(bodyParser.json());
@@ -47,20 +37,6 @@ function isAdmin(user) {
   return user && user.tiktokId === 'admin';
 }
 
-app.get('/admin/reservations', (req, res) => {
-  const user = req.session.user;
-  if (!isAdmin(user)) {
-    return res.status(403).json({ message: '管理者権限が必要です' });
-  }
-  db.all('SELECT * FROM reservations', (err, rows) => {
-    if (err) {
-      console.error('DB取得エラー:', err);
-      return res.status(500).json({ message: 'DB取得エラー' });
-    }
-    res.json(rows);
-  });
-});
-
 // 時間帯文字列を1時間単位の配列に分解する関数
 function parseTimeRange(timeRange) {
   const [start, end] = timeRange.split('-');
@@ -71,6 +47,19 @@ function parseTimeRange(timeRange) {
     hours.push(h.toString().padStart(2, '0') + ':00');
   }
   return hours;
+}
+
+// Discord Webhook URL (環境変数で管理推奨)
+const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+
+// Discord通知関数
+function notifyDiscord(message) {
+  console.log("📢 Discord通知内容:", message);
+  fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content: message }),
+  }).catch(err => console.error('Discord通知失敗:', err));
 }
 
 // ログイン処理
@@ -100,33 +89,51 @@ app.get('/session', (req, res) => {
   }
 });
 
-// 全予約取得
-app.get('/reservations', (req, res) => {
-  db.all('SELECT * FROM reservations', (err, rows) => {
-    if (err) {
-      console.error('DB取得エラー:', err);
-      return res.status(500).json([]);
-    }
-    res.json(rows);
-  });
+// 管理者専用 全予約取得
+app.get('/admin/reservations', async (req, res) => {
+  const user = req.session.user;
+  if (!isAdmin(user)) {
+    return res.status(403).json({ message: '管理者権限が必要です' });
+  }
+  const { data, error } = await supabase
+    .from('reservations')
+    .select('*');
+  if (error) {
+    console.error('DB取得エラー:', error);
+    return res.status(500).json({ message: 'DB取得エラー' });
+  }
+  res.json(data);
+});
+
+// 全予約取得（管理者用ではない場合も、従来通り必要なら修正してください）
+app.get('/reservations', async (req, res) => {
+  const { data, error } = await supabase
+    .from('reservations')
+    .select('*');
+  if (error) {
+    console.error('DB取得エラー:', error);
+    return res.status(500).json([]);
+  }
+  res.json(data);
 });
 
 // 自分の予約取得
-app.get('/my-reservations', (req, res) => {
+app.get('/my-reservations', async (req, res) => {
   const user = req.session.user;
   if (!user) return res.status(401).json([]);
-  const sql = 'SELECT * FROM reservations WHERE name = ?';
-  db.all(sql, [user.tiktokId], (err, rows) => {
-    if (err) {
-      console.error('DBエラー:', err);
-      return res.status(500).json([]);
-    }
-    res.json(rows);
-  });
+  const { data, error } = await supabase
+    .from('reservations')
+    .select('*')
+    .eq('name', user.tiktokId);
+  if (error) {
+    console.error('DBエラー:', error);
+    return res.status(500).json([]);
+  }
+  res.json(data);
 });
 
 // 空き時間取得
-app.get('/available-times', (req, res) => {
+app.get('/available-times', async (req, res) => {
   const { date } = req.query;
   const timeSlots = [
     "09:00-10:00",
@@ -136,158 +143,182 @@ app.get('/available-times', (req, res) => {
     "10:00-12:00",
     "09:00-12:00",
   ];
-  const sql = 'SELECT time FROM reservations WHERE date = ? AND status != ?';
-  db.all(sql, [date, 'rejected'], (err, rows) => {
-    if (err) {
-      console.error('DBエラー:', err);
-      return res.json({ available: timeSlots });
-    }
-    const bookedHours = rows.flatMap(r => parseTimeRange(r.time));
-    const available = timeSlots.filter(slot => {
-      const slotHours = parseTimeRange(slot);
-      return !slotHours.some(h => bookedHours.includes(h));
-    });
-    res.json({ available });
+
+  const { data, error } = await supabase
+    .from('reservations')
+    .select('time')
+    .eq('date', date)
+    .neq('status', 'rejected');
+
+  if (error) {
+    console.error('DBエラー:', error);
+    return res.json({ available: timeSlots });
+  }
+
+  const bookedHours = data.flatMap(r => parseTimeRange(r.time));
+  const available = timeSlots.filter(slot => {
+    const slotHours = parseTimeRange(slot);
+    return !slotHours.some(h => bookedHours.includes(h));
   });
+  res.json({ available });
 });
 
 // サマリー取得
-app.get('/reservations-summary', (req, res) => {
-  const sql = `SELECT date, COUNT(*) AS count FROM reservations WHERE status != 'rejected' GROUP BY date`;
-  db.all(sql, [], (err, rows) => {
-    if (err) {
-      console.error('DB読み込みエラー:', err);
-      return res.json({});
+app.get('/reservations-summary', async (req, res) => {
+  // Supabaseでgroup byはRPCかビューが必要なためここは簡易的に全件取得して集計
+  const { data, error } = await supabase
+    .from('reservations')
+    .select('date, status');
+
+  if (error) {
+    console.error('DB読み込みエラー:', error);
+    return res.json({});
+  }
+
+  const summary = {};
+  data.forEach(row => {
+    if (row.status !== 'rejected') {
+      summary[row.date] = (summary[row.date] || 0) + 1;
     }
-    const summary = {};
-    rows.forEach(row => {
-      summary[row.date] = row.count;
-    });
-    res.json(summary);
   });
+  res.json(summary);
 });
 
 // 予約登録
-app.post('/reserve', (req, res) => {
+app.post('/reserve', async (req, res) => {
   const user = req.session.user;
   if (!user) return res.json({ message: '❌ ログインが必要です。' });
+
   const { date, time } = req.body;
-  if (date === '2025-05-27') {
-    return res.json({ message: '❌ 5/27は予約できません。' });
+
+  // その日に既に予約してるか確認
+  const { data: existing, error } = await supabase
+    .from('reservations')
+    .select('*')
+    .eq('name', user.tiktokId)
+    .eq('date', date);
+
+  if (error) {
+    console.error('データ取得エラー:', error);
+    return res.json({ message: '❌ データ取得に失敗しました。' });
   }
-  const checkSql = 'SELECT * FROM reservations WHERE date = ?';
-  db.all(checkSql, [date], (err, rows) => {
-    if (err) {
-      console.error('DB読み込みエラー:', err);
-      return res.json({ message: '❌ データ取得に失敗しました。' });
-    }
-    const duplicate = rows.find(r => r.name === user.tiktokId);
-    if (duplicate) {
-      return res.json({ message: '❌ すでにこの日に予約済みです。' });
-    }
-    /*const newHours = parseTimeRange(time);
-    const overlap = rows.some(r => {
-      if (r.status === 'rejected') return false;
-      const existingHours = parseTimeRange(r.time);
-      return existingHours.some(h => newHours.includes(h));
-    });
-    if (overlap) {
-      return res.json({ message: '❌ その時間帯はすでに埋まっています。' });
-    }*/
-    const confirmedCount = rows.filter(r => r.status === 'confirmed').length;
-    const subscriberCount = rows.filter(r => r.status === 'confirmed' && SUBSCRIBER_IDS.includes(r.subId)).length;
-    let status = 'pending';
-    if (user.hasSub) {
-      if (confirmedCount >= MAX_RESERVATIONS_PER_DAY || subscriberCount >= MAX_SUBSCRIBER_SLOTS) {
-        return res.json({ message: '❌ この日は満員です。' });
-      }
-      status = 'confirmed';
-    }
-    const insertSql = `
-      INSERT INTO reservations (accountType, name, epicId, subId, hasSub, date, time, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-    db.run(insertSql, [
-      user.accountType || 'TikTok',
-      user.tiktokId,
-      user.epicId,
-      user.subId,
-      user.hasSub ? 1 : 0,
+  if (existing.length > 0) {
+    return res.json({ message: '❌ すでにこの日に予約済みです。' });
+  }
+
+  // 同日の予約全体を取得
+  const { data: allReservations, error: allErr } = await supabase
+    .from('reservations')
+    .select('*')
+    .eq('date', date);
+
+  if (allErr) {
+    console.error('予約取得エラー:', allErr);
+    return res.json({ message: '❌ 状況確認に失敗しました。' });
+  }
+
+  const confirmed = allReservations.filter(r => r.status === 'confirmed');
+  const confirmedSubs = confirmed.filter(r => Number(r.hassub) === 1);  // ← 修正ポイント
+
+  let status = 'pending';
+
+  // サブスク有 → confirmed枠が2人未満なら確定予約
+ if (user.hasSub) {
+  if (confirmedSubs.length >= MAX_SUBSCRIBER_SLOTS) {
+    return res.json({ message: '❌ サブスク優先枠が上限に達しています。' });
+  }
+  if (confirmed.length >= MAX_RESERVATIONS_PER_DAY) {
+    return res.json({ message: '❌ 予約人数が上限に達しています。' });
+  }
+  status = 'confirmed';
+} else {
+  // サブスク無：仮予約（抽選対象）として受付
+  status = 'pending';
+}
+
+  const { error: insertError } = await supabase
+    .from('reservations')
+    .insert([{
+      name: user.tiktokId,
+      epicid: user.epicId,
+      subid: user.subId,
+      hassub: user.hasSub ? 1 : 0,
+      accounttype: user.accountType,
       date,
       time,
       status
-    ], function (err) {
-      if (err) {
-        console.error('予約保存失敗:', err);
-        return res.json({ message: '❌ 予約保存に失敗しました。' });
-      }
-      if (status === 'confirmed') {
-        res.json({ message: '✅ サブスク優先予約が完了しました。' });
-      } else {
-        res.json({ message: '⏳ 抽選予約を受け付けました。結果は前日12:00以降に反映されます。' });
-      }
-    });
-  });
-});
+    }]);
 
-// 抽選結果一覧取得
-app.get('/lottery-results', (req, res) => {
-  const sql = `SELECT * FROM reservations WHERE status = 'confirmed' OR status = 'rejected'`;
-  db.all(sql, [], (err, rows) => {
-    if (err) {
-      console.error('DB読み込みエラー:', err);
-      return res.json([]);
-    }
-    res.json(rows);
-  });
-});
-// 強制抽選実行（管理者専用）
-app.post('/admin/force-lottery', (req, res) => {
-  const user = req.session.user;
-  if (!isAdmin(user)) {
-    return res.status(403).json({ message: '管理者専用エンドポイントです' });
+  if (insertError) {
+    console.error('予約登録エラー:', insertError);
+    return res.json({ message: '❌ 予約登録に失敗しました。' });
   }
-  runLottery()
-    .then(() => res.json({ message: '✅ 抽選を強制実行しました' }))
-    .catch((err) => {
-      console.error('強制抽選エラー:', err);
-      res.status(500).json({ message: '❌ 抽選実行中にエラーが発生しました' });
-    });
+
+  if (status === 'confirmed') {
+    res.json({ message: '✅ サブスク優先予約が完了しました。' });
+  } else {
+    res.json({ message: '⏳ 仮予約を受け付けました。抽選結果は前日12:00に通知されます。' });
+  }
 });
 
+
+// 抽選結果一覧取得（確定または落選の予約のみ）
+app.get('/lottery-results', async (req, res) => {
+  const { data, error } = await supabase
+    .from('reservations')
+    .select('*')
+    .or('status.eq.confirmed,status.eq.rejected');
+
+  if (error) {
+    console.error('DB読み込みエラー:', error);
+    return res.json([]);
+  }
+  res.json(data);
+});
 
 // 予約キャンセル
-app.post('/cancel', (req, res) => {
+app.post('/cancel', async (req, res) => {
   const user = req.session.user;
   if (!user) return res.json({ message: '❌ ログインが必要です。' });
+
   const { date, time } = req.body;
-  const sql = 'DELETE FROM reservations WHERE name = ? AND date = ? AND time = ?';
-  db.run(sql, [user.tiktokId, date, time], function (err) {
-    if (err) {
-      console.error('キャンセル失敗:', err);
-      return res.json({ message: '❌ キャンセル処理に失敗しました。' });
-    }
-    if (this.changes === 0) {
-      return res.json({ message: '❌ 該当の予約が見つかりません。' });
-    }
-    res.json({ message: '✅ 予約をキャンセルしました。' });
-  });
+
+  const { error } = await supabase
+    .from('reservations')
+    .delete()
+    .eq('name', user.tiktokId)
+    .eq('date', date)
+    .eq('time', time);
+
+  if (error) {
+    console.error('キャンセル失敗:', error);
+    return res.json({ message: '❌ キャンセル処理に失敗しました。' });
+  }
+  res.json({ message: '✅ 予約をキャンセルしました。' });
 });
 
 // 今日の抽選結果取得
-app.get('/my-today-result', (req, res) => {
+app.get('/my-today-result', async (req, res) => {
   const user = req.session.user;
   if (!user) return res.json({ status: 'none' });
-  const today = new Date().toISOString().split('T')[0];
-  const sql = `SELECT status, time FROM reservations WHERE name = ? AND date = ? LIMIT 1`;
-  db.get(sql, [user.tiktokId, today], (err, row) => {
-    if (err) {
-      console.error('DBエラー:', err);
-      return res.json({ status: 'none' });
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from('reservations')
+    .select('status, time')
+    .eq('name', user.tiktokId)
+    .eq('date', today)
+    .limit(1)
+    .single();
+
+  if (error || !data) {
+    if (error && error.code !== 'PGRST116') {
+      console.error('DBエラー:', error);
     }
-    if (!row) return res.json({ status: 'none' });
-    res.json({ status: row.status, time: row.time });
-  });
+    return res.json({ status: 'none' });
+  }
+  res.json({ status: data.status, time: data.time });
 });
 
 // 配列シャッフル用関数
@@ -298,140 +329,138 @@ function shuffleArray(array) {
   }
 }
 
-// sqlite3 の run を Promise版で使うラッパー関数
-function runAsync(db, sql, params=[]) {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
-      if (err) reject(err);
-      else resolve(this);
-    });
-  });
-}
-
-// Discord Webhook URLをグローバル定義（安全な方法で管理推奨）
-const webhookUrl = 'https://discord.com/api/webhooks/1385535108143911003/mOjAX4c0kBjf-KMEYiPZNJxiACRBIJsKwiSP1N01fpRik7asfQTnwBrjged1sW-bWwST';
-
-// Discord通知関数（グローバルに1回だけ定義）
-function notifyDiscord(message) {
-  fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content: message }),
-  }).catch(err => console.error('Discord通知失敗:', err));
-}
-
-// 抽選処理（12時以降かつ未実行なら実行し、一度実行したら当日は二重実行しない）
+// 抽選処理（12時以降に1日1回だけ実行）
 async function runLottery() {
   const now = new Date();
+  if (now.getHours() < 12) return;
 
-  // 実行タイミングは12:00以降（例：12:00～12:59）に1回だけ
-  if (now.getHours() < 12) return; // 12時以前は実行しない
+  const todayStr = now.toISOString().slice(0, 10);
 
-  const todayStr = now.toISOString().slice(0,10);
-
-  // 最終実行日をファイルから読み込み
   let lastRunDate = null;
   try {
     lastRunDate = fs.readFileSync(lotteryLockFile, 'utf8');
   } catch {
     lastRunDate = null;
   }
+  if (lastRunDate === todayStr) return; // 当日すでに実行済み
 
-  if (lastRunDate === todayStr) {
-    // 今日すでに抽選済み
+  // 対象は翌日の予約
+  const targetDate = new Date(now);
+  targetDate.setDate(targetDate.getDate() + 1);
+  const targetDateStr = targetDate.toISOString().slice(0, 10);
+
+  // 予約取得
+  const { data: allRows, error } = await supabase
+    .from('reservations')
+    .select('*')
+    .eq('date', targetDateStr);
+
+  if (error) {
+    console.error('抽選DB読み込み失敗:', error);
+    return;
+  }
+  if (!allRows || allRows.length === 0) return;
+
+  const pending = allRows.filter(r => r.status === 'pending');
+  if (pending.length === 0) return;
+
+  const confirmed = allRows.filter(r => r.status === 'confirmed');
+  const alreadyConfirmed = confirmed.length;
+
+  const availableSlots = MAX_RESERVATIONS_PER_DAY - alreadyConfirmed;
+
+  // 抽選対象シャッフル
+  const candidates = [...pending];
+  shuffleArray(candidates);
+
+  let confirmedCount = 0;
+  const updates = [];
+
+  for (const r of candidates) {
+    const newStatus = confirmedCount < availableSlots ? 'confirmed' : 'rejected';
+    if (newStatus === 'confirmed') confirmedCount++;
+    updates.push({
+      id: r.id,
+      status: newStatus
+    });
+  }
+
+  // ステータス更新をバルクで行う（1件ずつ個別更新する方法がSupabaseにはないため複数回更新を逐次実行）
+  try {
+    for (const u of updates) {
+      await supabase
+        .from('reservations')
+        .update({ status: u.status })
+        .eq('id', u.id);
+    }
+  } catch (e) {
+    console.error('抽選DB更新エラー:', e);
     return;
   }
 
-  const targetDate = new Date(now);
-  targetDate.setDate(targetDate.getDate() + 1);
-  const targetDateStr = targetDate.toISOString().slice(0,10);
-
-  // DBから予約情報取得
-  db.all('SELECT * FROM reservations WHERE date = ?', [targetDateStr], async (err, allRows) => {
-    if (err) {
-      console.error('抽選DB読み込み失敗:', err);
-      return;
-    }
-
-    const pending = allRows.filter(r => r.status === 'pending');
-    if (pending.length === 0) return;
-
-    const confirmed = allRows.filter(r => r.status === 'confirmed');
-    const alreadyConfirmed = confirmed.length;
-    const subscriberConfirmed = confirmed.filter(r => SUBSCRIBER_IDS.includes(r.subId)).length;
-    const availableSlots = MAX_RESERVATIONS_PER_DAY - alreadyConfirmed;
-
-    const candidates = [...pending];
-    shuffleArray(candidates);
-
-    let confirmedCount = 0;
-    const updates = [];
-
-    for (let r of candidates) {
-      const newStatus = confirmedCount < availableSlots ? 'confirmed' : 'rejected';
-      if (newStatus === 'confirmed') confirmedCount++;
-      updates.push({
-        id: r.id,
-        name: r.name,
-        status: newStatus
-      });
-    }
-
-    // トランザクション開始〜コミットまでPromiseで確実に処理
-    try {
-      await runAsync(db, "BEGIN TRANSACTION");
-      for (const u of updates) {
-        await runAsync(db, `UPDATE reservations SET status = ? WHERE id = ?`, [u.status, u.id]);
-      }
-      await runAsync(db, "COMMIT");
-    } catch (e) {
-      console.error('抽選DB更新エラー:', e);
-      await runAsync(db, "ROLLBACK").catch(()=>{});
-      return;
-    }
-
-    // 実行日時をロックファイルに書き込み（当日実行済み記録）
-    try {
-      fs.writeFileSync(lotteryLockFile, todayStr, 'utf8');
-    } catch(e) {
-      console.error('抽選実行ロックファイル書き込み失敗:', e);
-    }
-
-    // 抽選ログ保存
-    const logEntry = {
-      executedAt: now.toISOString(),
-      targetDate: targetDateStr,
-      results: updates
-    };
-    const logPath = path.join(__dirname, 'lottery.log.json');
-    fs.readFile(logPath, (err, data) => {
-  let logs = [];
-  if (!err && data.length > 0) {
-    try { logs = JSON.parse(data); } catch {}
+  // 実行日時をロックファイルに書き込み
+  try {
+    fs.writeFileSync(lotteryLockFile, todayStr, 'utf8');
+  } catch (e) {
+    console.error('抽選実行ロックファイル書き込み失敗:', e);
   }
-  logs.push(logEntry);
-  fs.writeFile(logPath, JSON.stringify(logs, null, 2), () => {
 
-    // ✅ 抽選ログ書き込みが終わった後にDiscord通知
-    const confirmedUsers = updates.filter(u => u.status === 'confirmed').map(u => u.name);
-    const rejectedUsers = updates.filter(u => u.status === 'rejected').map(u => u.name);
+  // 抽選ログ追記
+  const logEntry = {
+    executedAt: now.toISOString(),
+    targetDate: targetDateStr,
+    results: updates
+  };
+  const logPath = path.join(__dirname, 'lottery.log.json');
+  fs.readFile(logPath, (err, data) => {
+    let logs = [];
+    if (!err && data.length > 0) {
+      try { logs = JSON.parse(data); } catch {}
+    }
+    logs.push(logEntry);
+    fs.writeFile(logPath, JSON.stringify(logs, null, 2), () => {
+      // Discord通知
+      const confirmedUsers = updates.filter(u => u.status === 'confirmed').map(u => {
+        const userObj = allRows.find(row => row.id === u.id);
+        return userObj ? userObj.name : '(不明)';
+      });
+      const rejectedUsers = updates.filter(u => u.status === 'rejected').map(u => {
+        const userObj = allRows.find(row => row.id === u.id);
+        return userObj ? userObj.name : '(不明)';
+      });
 
-    let message = `@everyone\n🎯 ${targetDateStr} 抽選結果\n`;
-    message += `✅ 当選: ${confirmedUsers.length > 0 ? confirmedUsers.join(', ') : 'なし'}\n`;
-    message += `❌ 落選: ${rejectedUsers.length > 0 ? rejectedUsers.join(', ') : 'なし'}`;
+      let message = `@everyone\n🎯 ${targetDateStr} 抽選結果\n`;
+      message += `✅ 当選: ${confirmedUsers.length > 0 ? confirmedUsers.join(', ') : 'なし'}\n`;
+      message += `❌ 落選: ${rejectedUsers.length > 0 ? rejectedUsers.join(', ') : 'なし'}`;
 
-    notifyDiscord(message); // ← ここで通知を送る
-
-  });
-});
-
-
+      notifyDiscord(message);
+      console.log("✅ Discord通知を送信しました:", message);
+    });
   });
 }
 
-// 1分ごとに抽選実行判定
+// 管理者専用 抽選強制実行API
+app.post('/admin/force-lottery', async (req, res) => {
+  const user = req.session.user;
+  if (!isAdmin(user)) {
+    return res.status(403).json({ message: '管理者専用エンドポイントです' });
+  }
+  try {
+    await runLottery();
+    res.json({ message: '✅ 抽選を強制実行しました' });
+  } catch (err) {
+    console.error('強制抽選エラー:', err);
+    res.status(500).json({ message: '❌ 抽選実行中にエラーが発生しました' });
+  }
+});
+
+// 1分ごとに抽選判定を実行
 setInterval(runLottery, 60 * 1000);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+// 起動時に1回抽選を実行
+runLottery();
+console.log("✅ runLotteryが呼び出されました");
