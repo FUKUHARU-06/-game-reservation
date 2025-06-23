@@ -6,7 +6,7 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 // node-fetch をインストール済みと仮定
-const fetch = require('node-fetch');
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 // Supabaseクライアント
 const { createClient } = require('@supabase/supabase-js');
@@ -55,7 +55,7 @@ const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
 // Discord通知関数
 function notifyDiscord(message) {
   console.log("📢 Discord通知内容:", message);
-  fetch(webhookUrl, {
+  fetch(process.env.DISCORD_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content: message }),
