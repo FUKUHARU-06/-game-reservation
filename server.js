@@ -438,6 +438,16 @@ async function runLottery() {
     });
   });
 }
+// 秘密キー付きの抽選実行エンドポイント（セッション不要）
+app.post('/cron/lottery', async (req, res) => {
+  const secret = req.headers['x-cron-secret'];
+  if (secret !== process.env.CRON_SECRET) {
+    return res.status(403).json({ message: 'Forbidden' });
+  }
+  await runLottery();
+  res.json({ message: '✅ 抽選実行完了' });
+});
+
 
 // Discord Webhook テスト用（管理者専用）
 app.get('/admin/test-webhook', (req, res) => {
@@ -472,5 +482,5 @@ app.listen(PORT, () => {
 });
 
 // 起動時に1回抽選を実行
-runLottery();
+//runLottery();
 console.log("✅ runLotteryが呼び出されました");
