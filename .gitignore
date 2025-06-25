@@ -1,3 +1,4 @@
 node_modules/
 .env
 lottery_last_run.txt
+lottery.log.json

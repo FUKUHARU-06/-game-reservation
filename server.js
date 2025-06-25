@@ -257,7 +257,7 @@ app.post('/reserve', async (req, res) => {
   if (status === 'confirmed') {
     res.json({ message: '✅ サブスク優先予約が完了しました。' });
   } else {
-    res.json({ message: '⏳ 仮予約を受け付けました。抽選結果は前日12:00に通知されます。' });
+    res.json({ message: '⏳ 仮予約を受け付けました。抽選結果は前日に通知されます。' });
   }
 });
 

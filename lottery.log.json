@@ -19,5 +19,49 @@
         "status": "rejected"
       }
     ]
+  },
+  {
+    "executedAt": "2025-06-24T11:29:50.857Z",
+    "targetDate": "2025-06-25",
+    "results": [
+      {
+        "id": 16,
+        "status": "confirmed"
+      },
+      {
+        "id": 18,
+        "status": "confirmed"
+      },
+      {
+        "id": 17,
+        "status": "rejected"
+      }
+    ]
+  },
+  {
+    "executedAt": "2025-06-25T09:08:08.671Z",
+    "targetDate": "2025-06-26",
+    "results": [
+      {
+        "id": 30,
+        "status": "confirmed"
+      },
+      {
+        "id": 32,
+        "status": "confirmed"
+      },
+      {
+        "id": 31,
+        "status": "confirmed"
+      },
+      {
+        "id": 33,
+        "status": "rejected"
+      },
+      {
+        "id": 34,
+        "status": "rejected"
+      }
+    ]
   }
 ]
