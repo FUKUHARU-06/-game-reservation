@@ -204,6 +204,9 @@
   </div>
   <p id="login-result"></p>
 </div>
+<button id="force-lottery-btn" style="display: none;">🎯 抽選を強制実行する</button>
+<div id="lottery-result-message"></div>
+
 
 <!-- お知らせ欄 -->
 <div id="notice-area">
@@ -372,6 +375,10 @@
     } catch (e) {
       reservationList.innerHTML = '<li>予約情報の取得に失敗しました。</li>';
     }
+    if (typeof renderStatusLabels === 'function') {
+  renderStatusLabels();
+}
+
   }
 </script>
 

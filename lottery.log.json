@@ -63,5 +63,19 @@
         "status": "rejected"
       }
     ]
+  },
+  {
+    "executedAt": "2025-06-26T11:31:28.138Z",
+    "targetDate": "2025-06-27",
+    "results": [
+      {
+        "id": 35,
+        "status": "confirmed"
+      },
+      {
+        "id": 36,
+        "status": "confirmed"
+      }
+    ]
   }
 ]
