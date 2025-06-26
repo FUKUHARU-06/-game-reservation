@@ -124,7 +124,8 @@ app.get('/my-reservations', async (req, res) => {
   const { data, error } = await supabase
     .from('reservations')
     .select('*')
-    .eq('name', user.tiktokId);
+    .eq('name', user.tiktokId)
+    .eq('epicid', user.epicId);
   if (error) {
     console.error('DBエラー:', error);
     return res.status(500).json([]);
@@ -196,6 +197,7 @@ app.post('/reserve', async (req, res) => {
     .from('reservations')
     .select('*')
     .eq('name', user.tiktokId)
+    .eq('epicid', user.epicId)  // ← 追加
     .eq('date', date);
 
   if (error) {
@@ -287,6 +289,7 @@ app.post('/cancel', async (req, res) => {
     .from('reservations')
     .delete()
     .eq('name', user.tiktokId)
+    .eq('epicid', user.epicId)  // ← 追加
     .eq('date', date)
     .eq('time', time);
 
@@ -308,6 +311,7 @@ app.get('/my-today-result', async (req, res) => {
     .from('reservations')
     .select('status, time')
     .eq('name', user.tiktokId)
+    .eq('epicid', user.epicId)  // ← 追加
     .eq('date', today)
     .limit(1)
     .single();

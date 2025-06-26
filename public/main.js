@@ -227,7 +227,7 @@ forceLotteryBtn.addEventListener('click', () => {
   }
 
   async function checkSession() {
-    const res = await fetch('/session');
+    const res = await fetch('/session', { credentials: 'include' }); // 追加);
     const data = await res.json();
     const tiktokIdInput = document.getElementById('accountName');
     const accountTypeSelect = document.getElementById('account-type');
@@ -238,8 +238,10 @@ forceLotteryBtn.addEventListener('click', () => {
       tiktokIdInput.value = currentUser.tiktokId;
       accountTypeSelect.value = currentUser.accountType || 'tiktok';
       tiktokIdInput.disabled = true;
-      epicIdInput.value = currentUser.epicId;
+
+      epicIdInput.value = currentUser.epicId || '';
       epicIdInput.disabled = true;
+      
       subIdInput.value = currentUser.subId || '';
       subIdInput.disabled = true;
 
@@ -288,6 +290,7 @@ forceLotteryBtn.addEventListener('click', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tiktokId, epicId, subId, accountType }),
+      credentials: 'include'
 
     });
     const data = await res.json();
@@ -301,6 +304,7 @@ forceLotteryBtn.addEventListener('click', () => {
   });
 
   logoutBtn.addEventListener('click', async () => {
+    await fetch('/logout', { credentials: 'include' }); // 追加
     await fetch('/logout');
     await checkSession();
     calendar.refetchEvents();
@@ -336,6 +340,7 @@ forceLotteryBtn.addEventListener('click', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ date, time }),
+      credentials: 'include' // 追加
     });
     const data = await res.json();
     reserveResult.textContent = data.message;
@@ -362,6 +367,7 @@ forceLotteryBtn.addEventListener('click', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ date, time }),
+      credentials: 'include' // 追加
     });
     const data = await res.json();
     reserveResult.textContent = data.message;
@@ -500,7 +506,8 @@ forceLotteryBtn.addEventListener('click', () => {
           const cancelRes = await fetch('/cancel', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date: r.date, time: r.time })
+            body: JSON.stringify({ date: r.date, time: r.time }),
+            credentials: 'include'
           });
 
           const cancelData = await cancelRes.json();
