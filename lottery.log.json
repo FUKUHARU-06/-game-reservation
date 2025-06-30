@@ -77,5 +77,23 @@
         "status": "confirmed"
       }
     ]
+  },
+  {
+    "executedAt": "2025-06-27T08:50:59.877Z",
+    "targetDate": "2025-06-28",
+    "results": [
+      {
+        "id": 43,
+        "status": "confirmed"
+      },
+      {
+        "id": 41,
+        "status": "confirmed"
+      },
+      {
+        "id": 38,
+        "status": "rejected"
+      }
+    ]
   }
 ]

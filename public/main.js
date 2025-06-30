@@ -34,20 +34,37 @@ document.addEventListener('DOMContentLoaded', function () {
   let adminAutoRefreshInterval = null;
 
   const availableDates = {
-    '2025-06-17': true,
-    '2025-06-18': true,
-    '2025-06-19': true,
-    '2025-06-20': true,
-    '2025-06-21': true,
-    '2025-06-22': true,
-    '2025-06-23': true,
-    '2025-06-24': true,
-    '2025-06-25': true,
-    '2025-06-26': true,
-    '2025-06-27': true,
-    '2025-06-28': true,
-    '2025-06-29': true,
-    '2025-06-30': true,
+  '2025-07-01': true,
+  '2025-07-02': true,
+  '2025-07-03': true,
+  '2025-07-04': true,
+  '2025-07-05': true,
+  '2025-07-06': true,
+  '2025-07-07': true,
+  '2025-07-08': true,
+  '2025-07-09': true,
+  '2025-07-10': true,
+  '2025-07-11': true,
+  '2025-07-12': true,
+  '2025-07-13': true,
+  '2025-07-14': true,
+  '2025-07-15': true,
+  '2025-07-16': true,
+  '2025-07-17': true,
+  '2025-07-18': true,
+  '2025-07-19': true,
+  '2025-07-20': true,
+  '2025-07-21': true,
+  '2025-07-22': true,
+  '2025-07-23': true,
+  '2025-07-24': true,
+  '2025-07-25': true,
+  '2025-07-26': true,
+  '2025-07-27': true,
+  '2025-07-28': true,
+  '2025-07-29': true,
+  '2025-07-30': true,
+  '2025-07-31': true
   };
 
   // --- 追加 ---  
@@ -186,6 +203,10 @@ forceLotteryBtn.addEventListener('click', () => {
     calendar = new FullCalendar.Calendar(calendarEl, {
       initialView: 'dayGridMonth',
       initialDate: initDate.toISOString().slice(0, 10),
+      // ✅ 過去の日付に戻れないようにする
+    validRange: {
+      start: today.toISOString().slice(0, 10)
+    },
       dayMaxEvents: true,
       events: [],
       datesSet: function () {
