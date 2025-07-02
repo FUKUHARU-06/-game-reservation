@@ -336,7 +336,7 @@ function shuffleArray(array) {
 // 抽選処理（12時以降に1日1回だけ実行）
 async function runLottery() {
   const now = new Date();
-  if (now.getHours() < 12) return;
+  //if (now.getHours() < 12) return;
 
   const todayStr = now.toISOString().slice(0, 10);
 
