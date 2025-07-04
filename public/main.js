@@ -58,10 +58,10 @@ document.addEventListener('DOMContentLoaded', function () {
   '2025-07-22': true,
   '2025-07-23': true,
   '2025-07-24': true,
-  '2025-07-25': true,
-  '2025-07-26': true,
-  '2025-07-27': true,
-  '2025-07-28': true,
+  //'2025-07-25': true,
+  //'2025-07-26': true,
+  //'2025-07-27': true,
+  //'2025-07-28': true,
   '2025-07-29': true,
   '2025-07-30': true,
   '2025-07-31': true
@@ -149,7 +149,7 @@ forceLotteryBtn.addEventListener('click', () => {
 
     const lotteryDeadline = new Date(targetDate);
     lotteryDeadline.setDate(lotteryDeadline.getDate() - 1);
-    lotteryDeadline.setHours(12, 0, 0, 0);
+    lotteryDeadline.setHours(9, 0, 0, 0);
 
     const now = new Date();
 
