@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // '2025-07-16': true,
   // '2025-07-17': true,
   // '2025-07-18': true,
-  // '2025-07-19': true,
+   '2025-07-19': true,
   // '2025-07-20': true,
   // '2025-07-21': true,
   // '2025-07-22': true,
