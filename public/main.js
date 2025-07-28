@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function () {
   //'2025-07-28': true,
   //'2025-07-29': true,
   //'2025-07-30': true,
-  //'2025-07-31': true
+  '2025-07-31': true
   };
 
   // --- 追加 ---  

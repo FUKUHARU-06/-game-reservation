@@ -95,5 +95,15 @@
         "status": "rejected"
       }
     ]
+  },
+  {
+    "executedAt": "2025-07-18T06:10:51.579Z",
+    "targetDate": "2025-07-19",
+    "results": [
+      {
+        "id": 65,
+        "status": "confirmed"
+      }
+    ]
   }
 ]
