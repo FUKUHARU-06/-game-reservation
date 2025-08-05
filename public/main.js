@@ -44,11 +44,11 @@ document.addEventListener('DOMContentLoaded', function () {
   // '2025-08-08': true,
   // '2025-08-09': true,
   // '2025-08-10': true,
-  // '2025-08-11': true,
-  // '2025-08-12': true,
+  '2025-08-11': true,
+  '2025-08-12': true,
   '2025-08-13': true,
   '2025-08-14': true,
-  '2025-08-15': true,
+  //'2025-08-15': true,
  // '2025-08-16': true,
  // '2025-08-17': true,
   '2025-08-18': true,
@@ -65,6 +65,9 @@ document.addEventListener('DOMContentLoaded', function () {
   '2025-08-29': true,
   //'2025-08-30': true,
   //'2025-08-31': true
+  '2025-09-01': true,
+  '2025-09-02': true,
+  '2025-09-03': true,
   };
 
   // --- 追加 ---  
