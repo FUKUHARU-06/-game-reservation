@@ -34,8 +34,7 @@ document.addEventListener('DOMContentLoaded', function () {
   let adminAutoRefreshInterval = null;
 
   const availableDates = {
-  '2025-09-03': true,
-  '2025-09-07': true,
+  '2025-09-15': true,
   };
 
   // --- 追加 ---  
